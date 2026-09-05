@@ -9,8 +9,9 @@ enums, cascade deletions, and database session injection.
 from datetime import date, datetime, time, timezone
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
 
 from app.db.base import Base
 from app.db.database import get_db
@@ -29,6 +30,13 @@ from app.models import (
 async def in_memory_db():
     """Set up an in-memory SQLite database for testing."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -105,8 +113,15 @@ async def test_section_relationships_and_cascades(in_memory_db: AsyncSession):
     in_memory_db.add_all([task, train])
     await in_memory_db.commit()
 
-    # Query section with relationships
-    stmt = select(Section).where(Section.id == section.id)
+    # Query section with eager loaded relationships
+    stmt = (
+        select(Section)
+        .options(
+            selectinload(Section.maintenance_tasks),
+            selectinload(Section.train_schedules),
+        )
+        .where(Section.id == section.id)
+    )
     result = await in_memory_db.execute(stmt)
     fetched_section = result.scalar_one()
 
