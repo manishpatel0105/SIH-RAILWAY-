@@ -19,6 +19,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.config import get_settings
 from app.db.base import Base
+import app.models  # noqa: F401 Ensure all models are registered with Base.metadata
 
 # ── Alembic Config ────────────────────────────────────────────
 config = context.config
@@ -32,11 +33,11 @@ target_metadata = Base.metadata
 
 # ── Get Database URL ──────────────────────────────────────────
 # Alembic runs SYNCHRONOUSLY, so we need a sync database driver.
-# Our app uses asyncpg (async), so we swap it for psycopg2 (sync).
+# Our app uses asyncpg (async), so we swap it for psycopg (sync).
 
 settings = get_settings()
 sync_database_url = settings.database_url.replace(
-    "postgresql+asyncpg", "postgresql+psycopg2"
+    "postgresql+asyncpg", "postgresql+psycopg"
 )
 config.set_main_option("sqlalchemy.url", sync_database_url)
 
